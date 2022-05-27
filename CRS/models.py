@@ -249,13 +249,69 @@ class BlockSection(models.Model):
         ('3', '3'),
         ('4', '4'),
     )
+    Section_CHOICES = (
+        ('1', '1'),
+        ('2', '2'),
+        ('3', '3'),
+        ('4', '4'),
+        ('5', '5'),
+        ('6', '6'),
+        ('7', '7'),
+        ('8', '8'),
+        ('9', '9'),
+        ('10', '10'),
+    )
+    Course_CHOICES = (
+        ('1', 'CAUP'),
+        ('2', 'CBGM'),
+        ('3', 'CED'),
+        ('4', 'CET'),
+        ('5', 'CHASS'),
+        ('6', 'CN'),
+        ('7', 'CPT'),
+        ('8', 'CS'),
+    )
     Block_CHOICES = (
-        ('BS IT', 'BS IT'),
-        ('BS EE', 'BS EE'),
+        ('1', 'BS Arch'),
+        ('2', 'BSBA MM'),
+        ('3', 'BS BE'),
+        ('4', 'BSBA FM'),
+        ('5', 'BSBA HRM'),
+        ('6', 'BSBA OM'),
+        ('7', 'BS REM'),
+        ('8', 'BS Entre'),
+        ('9', 'BS Acctg'),
+        ('10', 'BSHM'),
+        ('11', 'BSTM'),
+        ('12', 'BGM'),
+        ('13', 'BSE'),
+        ('14', 'BEE'),
+        ('15', 'BPE'),
+        ('16', 'BECEd'),
+        ('17', 'BSCHE'),
+        ('18', 'BS ECE'),
+        ('19', 'BSME'),
+        ('20', 'BSMFGE'),
+        ('21', 'BSCE'),
+        ('22', 'BS CpE'),
+        ('23', 'BSEE'),
+        ('24', 'BSIT'),
+        ('25', 'BSCS'),
+        ('26', 'BAC'),
+        ('27', 'BAC-PR'),
+        ('28', 'BS SW'),
+        ('29', 'BMMP'),
+        ('30', 'BSN'),
+        ('31', 'BSPT'),
+        ('32', 'BS Bio'),
+        ('33', 'BS PSY'),
+        ('34', 'BS Math'),
+        ('35', 'BS Chem'),
+        
     )
     blockYear = models.CharField(max_length=150, null=True, choices= Year_CHOICES, verbose_name='Block Year Level')
-    blockSection = models.CharField(max_length=50,null=True, verbose_name='Block Section')
-    college = models.ForeignKey(College, null=True, verbose_name='College', on_delete=models.PROTECT)
+    blockSection = models.CharField(max_length=50,null=True, choices= Section_CHOICES,  verbose_name='Block Section')
+    college = models.CharField(max_length=50, null=True, choices= Course_CHOICES, verbose_name='College')
     blockCourse = models.CharField(max_length=50, null=True, choices= Block_CHOICES, verbose_name='Block Course')
     curryear = models.CharField(max_length=50, null=True, verbose_name='Curriculum Year')
     adviser = models.ForeignKey(FacultyInfo, on_delete=models.SET_NULL, null=True, blank=True)
