@@ -1,3 +1,4 @@
+from tkinter import Entry
 from django import forms
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.db import models
@@ -9,6 +10,9 @@ from django.core.validators import RegexValidator
 from django.forms import ValidationError
 from django.utils import timezone
 from django.contrib import messages
+from datetime import date
+from dis import findlabels
+
 
 import datetime
 import os
@@ -49,7 +53,7 @@ class College(models.Model):
 class UserManager(BaseUserManager):
     def create_user(self, email, firstName, middleName, lastName, password=None):
         """
-        Creates and saves a User with the given email, name and password.
+        Creates and saves a User with the given email, name, and password.
         """
         if not email:
             raise ValueError('Users must have an email address')
@@ -97,7 +101,7 @@ class User(AbstractBaseUser):
     )
     
     firstName = models.CharField(max_length=100, verbose_name='First Name')
-    middleName = models.CharField(max_length=100, blank=True, default=" ", verbose_name='Middle Name')
+    middleName = models.CharField(max_length=100, blank=False, default=" ", verbose_name='Middle Name')
     lastName = models.CharField(max_length=100, verbose_name='Last Name')
     
     is_active = models.BooleanField(default=True)
@@ -124,7 +128,7 @@ class User(AbstractBaseUser):
         """Does the user have permissions to view the app `app_label`?"""
         # Simplest possible answer: Yes, always
         return True
-
+    
     @property
     def is_staff(self):
         """Is the user a member of staff?"""
@@ -133,6 +137,9 @@ class User(AbstractBaseUser):
 
     def __str__(self):
         return self.email
+
+    class Meta:
+         verbose_name = "User"
 
 
 # Do not remove or modify the above users ^^
@@ -220,11 +227,47 @@ class FacultyInfo(models.Model):
         message=phone_error_message
     )
 
+    def fid_default():
+        year = date.today().year
+        id = FacultyInfo.objects.latest('facultyUser_id')
+        fetch = str(id)
+        final = fetch.split()[0].strip()
+        f_id = int(final)
+        overOneThousand = 0
+        lengthFacultyId = 0
+        stringFacultyID = str(f_id)
+        stringOverOneThousand = str(overOneThousand)
+        finalFacultyID = ''
+        lengthFacultyId = len(stringFacultyID)
+
+        def lengthOfRawFacultyId(lengthOfID ,rawFacultyId):
+            fiveDigitFacultyId = ''
+            if lengthOfID == 1:
+                fiveDigitFacultyId = '000' + rawFacultyId
+            elif lengthOfID == 2:
+                fiveDigitFacultyId = '00' + rawFacultyId
+            elif lengthOfID == 3:
+                fiveDigitFacultyId = '0' + rawFacultyId
+            return fiveDigitFacultyId
+
+        if f_id > 1000:
+            while f_id >= 1000:
+                f_id += 1
+                f_id -= 1000
+            stringOverOneThousand = str(overOneThousand)
+            stringFacultyID = str(f_id)
+            lengthFacultyId = len(stringFacultyID)
+            finalFacultyID = str(year) + stringOverOneThousand + lengthOfRawFacultyId(lengthFacultyId, stringFacultyID)
+        else:
+            finalFacultyID = str(year) + stringOverOneThousand + lengthOfRawFacultyId(lengthFacultyId, stringFacultyID)
+        
+        return finalFacultyID
+
     facultyUser = OneToOneField(User, on_delete=models.CASCADE, primary_key=True, verbose_name='Faculty User')
     facultyID = models.CharField(validators=[facultyID_regex], max_length=50,
-                                 unique=True, verbose_name='Faculty ID', null=True)
-    collegeID = ForeignKey(College, null=True, verbose_name='College', on_delete=models.SET_NULL, blank=True)
-    departmentID = ForeignKey(Department, null=True, verbose_name='Department', on_delete=models.SET_NULL, blank=True)
+                                 unique=True, verbose_name='Faculty ID', null=True, default=fid_default)
+    collegeID = ForeignKey(College, null=True, verbose_name='College', on_delete=models.SET_NULL, blank=False)
+    departmentID = ForeignKey(Department, null=True, verbose_name='Department', on_delete=models.SET_NULL, blank=False)
     facultyWorkstatus = models.CharField(max_length=100, choices=WorkStatus_CHOICES,
                                          null=True, verbose_name='Work Status')
     facultyGender = models.CharField(max_length=50, null=True, choices=Gender_CHOICES, verbose_name='Gender')
@@ -233,14 +276,14 @@ class FacultyInfo(models.Model):
     facultyCitizenship = models.CharField(max_length=50, null=True, default='Filipino',verbose_name='Citizenship')
     facultyContact = models.CharField(validators=[phone_regex], max_length=50,
                                       null=True, verbose_name='Contact Number')
-    facultyIn = models.CharField(max_length=100, null=True, blank=True, verbose_name='Time In', default = "7:00")
-    facultyOut = models.CharField(max_length=100, null=True, blank=True, verbose_name='Time Out', default = "22:00")
+    facultyIn = models.CharField(max_length=100, null=True, blank=False, verbose_name='Time In', default = "7:00")
+    facultyOut = models.CharField(max_length=100, null=True, blank=False, verbose_name='Time Out', default = "22:00")
 
     class Meta:
         verbose_name_plural = "Faculty Information"
 
     def __str__(self):
-       return '%s, %s - (%s) '%(self.facultyUser.lastName, self.facultyUser.firstName,self.facultyWorkstatus)
+       return '%s - %s, %s - (%s) '%(self.facultyUser.id, self.facultyUser.lastName, self.facultyUser.firstName,self.facultyWorkstatus)
 
 class BlockSection(models.Model):
     Year_CHOICES = (
@@ -317,11 +360,11 @@ class BlockSection(models.Model):
     adviser = models.ForeignKey(FacultyInfo, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
-        verbose_name_plural = "Block Sections"
+        verbose_name = "Block Section"
         constraints =[models.UniqueConstraint(fields=['blockYear', 'blockSection','blockCourse'], name='block section')]
 
     def __str__(self):
-        return '%s %s - %s' %(self.blockCourse,self.blockYear, self.blockSection)
+        return '%s %s - %s' %(self.blockCourse, self.blockYear, self.blockSection)
 
 
 # ------------------ Curriculum and Subjects----------------------------------------------------
@@ -333,7 +376,7 @@ class RoomSchedule(models.Model):
     classDay = models.CharField(max_length=200, choices=Day, null=True)
 
     class Meta:
-        verbose_name_plural = "Room Schedules"
+        verbose_name = "Room Schedule"
 
     def __str__(self):
         return self.classDay
@@ -382,7 +425,7 @@ class SubjectSchedule(models.Model):
     yearStanding = models.CharField(max_length=200, choices=YearStand, null=True)
 
     class Meta:
-        verbose_name_plural = "Subject Schedules"
+        verbose_name = "Subject Schedule"
 
     def __str__(self):
         return self.status
@@ -423,7 +466,7 @@ class curriculumInfo(models.Model):
 
 
 # --------------------------- Student Database-----------------------------------------
-class StudentInfo(models.Model):
+class StudentInfo(models.Model):    
     Type_CHOICES = (('Old', 'Old'), ('New', 'New'),)
     Status_CHOICES = (('Regular', 'Regular'), ('Irregular', 'Irregular'),)
 
@@ -434,7 +477,7 @@ class StudentInfo(models.Model):
     Year_CHOICES = (('1', '1'), ('2', '2'), ('3', '3'), ('4', '4'), ('5', '5'), ('6', '6'),)
 
     # ID number code. Can be copy pasted to suit ID code for certain user.
-    studentID_error_message = 'Faculty ID must be entered in format: 20XXXXXXX'
+    studentID_error_message = 'Student ID must be entered in format: 20XXXXXXX'
     studentID_regex = RegexValidator(
         regex=r'^20\d{7}$',
         message=studentID_error_message
@@ -452,11 +495,47 @@ class StudentInfo(models.Model):
         message=curr_error_message
     )
 
+    def sid_default():
+        year = date.today().year
+        id = StudentInfo.objects.latest('studentUser_id')
+        fetch = str(id)
+        final = fetch.split()[0].strip()
+        s_id = int(final)
+        overOneThousand = 0
+        lengthStudentId = 0
+        stringStudentID = str(s_id)
+        stringOverOneThousand = str(overOneThousand)
+        finalStudentID = ''
+        lengthStudentId = len(stringStudentID)
+
+        def lengthOfRawStudentId(lengthOfID ,rawStudentId):
+            fiveDigitStudentId = ''
+            if lengthOfID == 1:
+                fiveDigitStudentId = '000' + rawStudentId
+            elif lengthOfID == 2:
+                fiveDigitStudentId = '00' + rawStudentId
+            elif lengthOfID == 3:
+                fiveDigitStudentId = '0' + rawStudentId
+            return fiveDigitStudentId
+
+        if s_id > 1000:
+            while s_id >= 1000:
+                s_id += 1
+                s_id -= 1000
+            stringOverOneThousand = str(overOneThousand)
+            stringStudentID = str(s_id)
+            lengthStudentId = len(stringStudentID)
+            finalStudentID = str(year) + stringOverOneThousand + lengthOfRawStudentId(lengthStudentId, stringStudentID)
+        else:
+            finalStudentID = str(year) + stringOverOneThousand + lengthOfRawStudentId(lengthStudentId, stringStudentID)
+        
+        return finalStudentID
+
     studentUser = OneToOneField(User, on_delete=CASCADE, primary_key=True, verbose_name='Student Email')
     studentID = models.CharField(validators=[studentID_regex], max_length=50, unique=True, verbose_name='Student ID',
-                                 null=True)
-    collegeID = ForeignKey(College, null=True, verbose_name='College', on_delete=models.SET_NULL, blank=True)
-    departmentID = ForeignKey(Department, null=True, verbose_name='Department', on_delete=models.SET_NULL, blank=True)
+                                 null=True, default = sid_default)
+    collegeID = ForeignKey(College, null=True, verbose_name='College', on_delete=models.SET_NULL, blank=False)
+    departmentID = ForeignKey(Department, null=True, verbose_name='Department', on_delete=models.SET_NULL, blank=False)
     studentGender = models.CharField(max_length=50, null=True, choices=Gender_CHOICES, verbose_name='Gender')
     studentCitizenship = models.CharField(max_length=50, null=True,default='Filipino', verbose_name='Citizenship')
     studentCivilstatus = models.CharField(max_length=150, null=True, choices=CivilStatus_CHOICES,
@@ -468,7 +547,7 @@ class StudentInfo(models.Model):
     studentCourse = models.CharField(max_length=50, null=True, verbose_name='Course')
     studentYearlevel = models.CharField(max_length=150, null=True, choices=Year_CHOICES, verbose_name='Year Level')
     studentSection = models.ForeignKey(BlockSection, null=True, verbose_name='Section', on_delete=models.SET_NULL,
-                                       blank=True)
+                                       blank=False)
     studentCurriculum = models.CharField(validators=[curr_regex], max_length=50, verbose_name='Curriculum Year',
                                          null=True)
 
@@ -476,27 +555,27 @@ class StudentInfo(models.Model):
 
     class Meta:
         verbose_name_plural = "Student Information"
-
+    
     def __str__(self):
-        return self.studentID
+        return '%s - %s' %(self.studentUser.id, self.studentID)
 
 
 # HD Application
 class hdApplicant(models.Model):
-    studentID = models.ForeignKey(StudentInfo, null=True, verbose_name='Student', on_delete=models.CASCADE, blank=True)
-    studentDropform = models.FileField(upload_to='hdSubmission/', blank=True, null=True, verbose_name="Student Drop Form")
-    studentClearanceform = models.FileField(upload_to='hdSubmission/', blank=True, null=True, verbose_name="Student Clearance Form")
-    studentTransfercert = models.FileField(upload_to='hdSubmission/', blank=True, null=True, verbose_name="Student Transfer Certificate")
-    studentHdletter = models.FileField(upload_to='hdSubmission/', blank=True, null=True, verbose_name="Student HD Letter")
-    studentGrades = models.FileField(upload_to='hdSubmission/', blank=True, null=True, verbose_name="Student Grades")
-    stdParentsig = models.FileField(upload_to='hdSubmission/', blank=True, null=True, verbose_name="Student\'s Parent Signature")
+    studentID = models.ForeignKey(StudentInfo, null=True, verbose_name='Student', on_delete=models.CASCADE, blank=False)
+    studentDropform = models.FileField(upload_to='hdSubmission/', blank=False, null=True, verbose_name="Student Drop Form")
+    studentClearanceform = models.FileField(upload_to='hdSubmission/', blank=False, null=True, verbose_name="Student Clearance Form")
+    studentTransfercert = models.FileField(upload_to='hdSubmission/', blank=False, null=True, verbose_name="Student Transfer Certificate")
+    studentHdletter = models.FileField(upload_to='hdSubmission/', blank=False, null=True, verbose_name="Student HD Letter")
+    studentGrades = models.FileField(upload_to='hdSubmission/', blank=False, null=True, verbose_name="Student Grades")
+    stdParentsig = models.FileField(upload_to='hdSubmission/', blank=False, null=True, verbose_name="Student\'s Parent Signature")
     remarks = models.CharField(default="Submitted", max_length=25)
-    comment = models.TextField(max_length=150, null=True, blank=True, verbose_name="Feedback")
+    comment = models.TextField(max_length=150, null=True, blank=False, verbose_name="Feedback")
     hd_dateSubmitted = models.DateField(default=now, verbose_name="HD Date Submitted")
 
     # dateApproved = models.DateTimeField()
     class Meta:
-        verbose_name_plural = "HD Applicants"
+        verbose_name = "HD Applicant"
 
     def __str__(self):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
@@ -517,7 +596,7 @@ class OjtApplicant(models.Model):
     ojt_dateSubmitted = models.DateField(default=now, verbose_name='OJT Date Submitted')
 
     class Meta:
-        verbose_name_plural = "OJT Applicants"
+        verbose_name = "OJT Applicant"
 
     def __str__(self):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
@@ -531,7 +610,7 @@ class spApplicant(models.Model):
     comment = models.TextField(max_length=150, null=True, blank=True, verbose_name='Feedback')
 
     class Meta:
-        verbose_name_plural = "Study Plan Applicants"
+        verbose_name = "Study Plan Applicant"
 
     def __str__(self):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
@@ -552,7 +631,7 @@ class LOAApplicant(models.Model):
 
     # dateApproved = models.DateTimeField()
     class Meta:
-        verbose_name_plural = "LOA Applicants"
+        verbose_name= "LOA Applicant"
 
     def __str__(self):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
@@ -594,7 +673,7 @@ class currchecklist(models.Model):
     semTaken = models.CharField(max_length=50, choices=SEMESTER, verbose_name="School Sem", null=True)
 
     class Meta:
-            verbose_name_plural = "Checklists"
+            verbose_name = "Checklist"
 
     def __str__(self):
         return self.owner.studentUser.lastName
@@ -607,7 +686,7 @@ class crsGrade(models.Model):
     remarks = models.CharField(max_length=150, default='Submitted', verbose_name='Status')
 
     class Meta:
-            verbose_name_plural = "CRS Grades"
+            verbose_name = "CRS Grade"
 
     def __str__(self):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
@@ -623,7 +702,7 @@ class hdClearanceForm(models.Model):
                                       null=True)
     studentLastPCollege = models.CharField(max_length=100, verbose_name="College (Last/Present Enrollment in PLM)",
                                            null=True)
-    studentLastPSY = models.CharField(max_length=100, verbose_name="School year (Last/Present Enrollment in PLM)",
+    studentLastPSY = models.CharField(max_length=100, verbose_name="School Year (Last/Present Enrollment in PLM)",
                                       null=True)
     studentPurpose = models.CharField(max_length=100, verbose_name="Purpose of Clearance", null=True)
     studentOthers = models.CharField(max_length=100, verbose_name="If you picked others please specify:", blank=True,
@@ -634,7 +713,7 @@ class hdClearanceForm(models.Model):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
     
     class Meta:
-        verbose_name_plural = "HD Clearance Forms"
+        verbose_name = "HD Clearance Form"
 
 
 class hdTransferCert(models.Model):
@@ -660,7 +739,7 @@ class hdTransferCert(models.Model):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
 
     class Meta:
-        verbose_name_plural = "HD Transfer Certificate"
+        verbose_name = "HD Transfer Certificate"
 
 
 class loaClearanceForm(models.Model):
@@ -683,7 +762,7 @@ class loaClearanceForm(models.Model):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
 
     class Meta:
-        verbose_name_plural = "LOA Clearance Forms"
+        verbose_name = "LOA Clearance Form"
 
 # LOA FORM
 class loaForm(models.Model):
@@ -705,7 +784,7 @@ class loaForm(models.Model):
         return '%s - %s, %s '%(self.studentID, self.studentID.studentUser.lastName, self.studentID.studentUser.firstName)
 
     class Meta:
-        verbose_name_plural = "LOA Forms"
+        verbose_name = "LOA Form"
 
 # HD Dropping Form
 class HD_DroppingForm(models.Model):
@@ -719,7 +798,7 @@ class HD_DroppingForm(models.Model):
         return '%s - %s '%(self.id, os.path.basename(self.Admin_Upload.name))
 
     class Meta:
-            verbose_name_plural = "HD Dropping Form"
+            verbose_name = "HD Dropping Form"
     
     
 
@@ -743,7 +822,7 @@ class ShifterApplicant(models.Model):
     # dateApproved = models.DateTimeField()
 
     class Meta:
-        verbose_name_plural = "Shifter Applicants"
+        verbose_name = "Shifter Applicant"
         
     def __str__(self):
         return '%s - %s, %s '%(self.studentID, self.lname, self.fname)
@@ -770,7 +849,7 @@ class TransfereeApplicant(models.Model):
     # dateApproved = models.DateTimeField()
 
     class Meta:
-        verbose_name_plural = "Transferee Applicants"
+        verbose_name = "Transferee Applicant"
 
     def str(self):
         return '| %s  %s ' % (self.studentID, self.lname)
@@ -790,9 +869,16 @@ class studentScheduling(models.Model):
     ('Asynchronous','Asynchronous'),
     ('Synchronous','Synchronous'),
 )
+
+    def svalidate(value):
+        if value <= 0:
+            raise ValidationError(
+                ('Section cannot be <= 0')
+            )
+
     instructor = ForeignKey(FacultyInfo,  null=True, verbose_name='Instructor', on_delete=models.SET_NULL,blank=True)
     subjectCode = models.ForeignKey(curriculumInfo, null=True, verbose_name='Subjects', on_delete=models.CASCADE)
-    section = models.IntegerField(null=True,verbose_name='Subject Section' )
+    section = models.IntegerField(null=True, blank=False, verbose_name='Subject Section', validators=[svalidate])
     day = models.CharField(max_length=100, null=True, choices=MONTH, verbose_name='Day')
     timeStart = models.TimeField(verbose_name='Time Start')
     timeEnd = models.TimeField(verbose_name='Time End')
@@ -825,7 +911,7 @@ class FacultyApplicant(models.Model):
     remarks = models.CharField(max_length=150, default='Submitted', verbose_name='Status')
 
     class Meta:
-        verbose_name_plural = "Faculty Applicants"
+        verbose_name = "Faculty Applicant"
 
     def __str__(self):
         return self.email
@@ -904,7 +990,7 @@ class studyPlan(models.Model):
         return self.studentinfo.studentID
 
     class Meta:
-        verbose_name_plural = "Study Plans"
+        verbose_name = "Study Plan"
 
 class Notification(models.Model): 
     STATUS_CHOICES = (

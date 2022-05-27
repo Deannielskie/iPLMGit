@@ -1,3 +1,4 @@
+from http.client import HTTPS_PORT
 from django import forms
 from django.contrib import admin
 from django.contrib.auth.models import Group
@@ -6,6 +7,7 @@ from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.core.exceptions import ValidationError
 from django_admin_listfilter_dropdown.filters import ( DropdownFilter, ChoiceDropdownFilter, RelatedDropdownFilter )
 from django.contrib.auth.models import User
+from django.http import HttpResponse
 
 from .models import *
 
@@ -23,7 +25,7 @@ class UserCreationForm(forms.ModelForm):
     
     class Meta:
         model = User
-        fields = ('email', 'firstName', 'middleName', 'lastName')
+        fields = ('email', 'firstName', 'middleName', 'lastName', 'is_student', 'is_faculty', 'is_chairperson', 'is_admin')
 
     def clean_password2(self):
         # Check that the two password entries match
@@ -32,6 +34,23 @@ class UserCreationForm(forms.ModelForm):
         if password1 and password2 and password1 != password2:
             raise ValidationError("Passwords don't match")
         return password2
+
+    def clean(self):
+        is_student = self.cleaned_data.get('is_student')
+        is_admin = self.cleaned_data.get('is_admin')
+        is_faculty = self.cleaned_data.get('is_faculty')
+        is_chairperson = self.cleaned_data.get('is_chairperson')
+        if not is_student and not is_faculty and not is_chairperson and not is_admin:
+            raise ValidationError('Please select at least one(1) permission before proceeding')
+        
+        if is_admin and is_student:
+            raise ValidationError('You cannot apply both Student and Faculty permission to a user.')
+        
+        if is_faculty and is_student:
+            raise ValidationError('You cannot apply both Student and Faculty permission to a user.')
+
+        if is_chairperson and is_student:
+            raise ValidationError('You cannot apply both Student and Faculty permission to a user.')
 
     def save(self, commit=True):
         # Save the provided password in hashed format
@@ -52,6 +71,23 @@ class UserChangeForm(forms.ModelForm):
         model = User
         fields = ('email', 'password', 'firstName', 'middleName',
                   'lastName', 'is_active', 'is_admin', 'is_chairperson', 'is_faculty', 'is_student')
+    
+    def clean(self):
+        is_student = self.cleaned_data.get('is_student')
+        is_admin = self.cleaned_data.get('is_admin')
+        is_faculty = self.cleaned_data.get('is_faculty')
+        is_chairperson = self.cleaned_data.get('is_chairperson')
+        if not is_student and not is_faculty and not is_chairperson and not is_admin:
+            raise ValidationError('Please select at least one(1) permission before proceeding')
+        
+        if is_admin and is_student:
+            raise ValidationError('You cannot apply both Student and Faculty permission to a user.')
+        
+        if is_faculty and is_student:
+            raise ValidationError('You cannot apply both Student and Faculty permission to a user.')
+
+        if is_chairperson and is_student:
+            raise ValidationError('You cannot apply both Student and Faculty permission to a user.')
 
 class FacultyInfoInline(admin.StackedInline):
     # To add fields from Faculty database to User creation in Admin Site
@@ -562,7 +598,7 @@ admin.site.register(OjtApplicant, OjtApplicantAdmin)
 
 # SP STUDENT APPLICANT
 class spApplicantAdmin(admin.ModelAdmin):
-    search_fields = ['studentID__studentID']
+    search_fields = ['studentID__studentID', 'studentID__studentUser__firstName', 'studentID__studentUser__lastName']
     model = spApplicant
     list_display = ('get_id','course','studentID','get_fname','get_mname','get_lname','status','get_applicationstatus')
 
@@ -672,7 +708,7 @@ admin.site.register(ShifterApplicant, ShifterApplicantAdmin)
 class TransfereeApplicantAdmin(admin.ModelAdmin):
     search_fields = ['studentID', 'lname', 'fname', 'mname','eadd']
     model = TransfereeApplicant
-    list_display = ('get_id','course','studentID','FirstName','MiddleName','LastName','Applicationstatus')
+    list_display = ('get_id','course','studentID','get_fname','get_mname','get_lname','get_Applicationstatus')
 
     def get_id(self, obj):
         return obj.id
@@ -683,17 +719,25 @@ class TransfereeApplicantAdmin(admin.ModelAdmin):
     def studentID(self, obj):
         return obj.studentID
 
-    def FirstName(self, obj):
+    def get_fname(self, obj):
         return obj.fname
 
-    def MiddleName(self, obj):
+    get_fname.short_description = 'First Name'
+
+    def get_mname(self, obj):
         return obj.mname
 
-    def LastName(self, obj):
+    get_mname.short_description = 'Middle Name'
+
+    def get_lname(self, obj):
         return obj.lname
 
-    def Applicationstatus(self, obj):
+    get_lname.short_description = 'Last Name'
+
+    def get_Applicationstatus(self, obj):
         return obj.remarks
+
+    get_Applicationstatus.short_description = 'Application Status'
 
     list_filter = [('studentID',DropdownFilter),('remarks',DropdownFilter)]
 
